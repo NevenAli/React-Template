@@ -1,0 +1,234 @@
+# Project Overview
+
+This is a React + TypeScript + Vite template using MUI (v7) with Emotion for styling, `react-intl` for i18n, and a custom theme system with RTL support (via `stylis-plugin-rtl`).
+Key tooling:
+
+- React 19 + Vite 8
+- React Compiler enabled via `@vitejs/plugin-react` preset
+- TypeScript strict mode
+- ESLint recommended rules (React Hooks, React Refresh)
+- Theme/l10n architecture uses Providers + Context, with persistence in `localStorage`
+
+# Coding Standards
+
+## TypeScript & Imports
+
+- Keep the project fully type-safe under `strict: true`; avoid `any`.
+- Import types using `import type { ... }` where applicable.
+- Prefer absolute imports for internal modules using the `@/` alias.
+- Use `as const` for configuration/tokens to preserve literal types.
+- Keep utility functions pure (no React, no DOM side effects).
+
+## React Hooks
+
+- Always follow the Rules of Hooks (no conditional calls).
+- Use `useMemo` for derived values that are expensive or depend on multiple inputs.
+- Use `useCallback` for functions stored in context/value objects or passed to memoized children.
+- Put DOM side effects in `useEffect` (or inside event callbacks when the change originates from user interaction), not in the render body.
+- For derived “boolean flags” from state (like RTL), prefer `useMemo` over recomputing inline when it improves readability/perf.
+
+## Component Structure
+
+- Use function components.
+- Keep components focused: UI composition in components; theme/l10n logic in Providers; styling/theme tokens in theme files.
+- Avoid hardcoding theme colors/directions in UI components; consume them from `theme.palette` and `theme.applyStyles`.
+
+## Context + Provider Pattern (project default)
+
+For new global state that should be consumed by multiple components:
+
+- Create a `createContext<YourType | undefined>(undefined)`.
+- Implement a `Provider` component that owns the state and side effects.
+- Export a `useX()` hook that:
+  - calls `useContext(...)`
+  - throws a clear error if used outside the Provider
+- If you need to export both a Provider component and hooks from the same file (and you hit React Refresh lint constraints), match the existing pattern and disable `react-refresh/only-export-components` at the top of that file.
+
+## Naming Conventions
+
+- Components and Providers: `PascalCase` (e.g. `AppThemeProvider`, `LocalizationProvider`).
+- Hooks (custom): `usePascalCase` or `useCamelCase` but starting with `use` (e.g. `useAppTheme`, `useLocalization`).
+- Types/interfaces: `PascalCase` (e.g. `LocalizationContextType`).
+- Utility files:
+  - Single-purpose: use descriptive filenames (`typography.ts`, `units.ts`)
+  - Multi-word utilities: prefer `kebab-case` (`local-storage.ts`).
+
+# Folder Structure (Strict Guide)
+
+## Entrypoints / App Root
+
+- `src/main.tsx`: do not add app UI logic here; it should only bootstrap React and top-level Providers.
+- `src/App.tsx`: the app’s main UI composition; use Providers’ hooks for theme/locale values.
+
+## Providers (Context + Side Effects)
+
+- `src/providers/`:
+  - Put React Context providers and their corresponding `useX()` hooks here.
+  - Current pattern:
+    - `LocalizationProvider.tsx`: locale messages + RTL flag + `document.documentElement` updates
+    - `AppThemeProvider.tsx`: theme mode state, persistence, Emotion Cache switching for RTL, and MUI `ThemeProvider`
+
+## Theme System (MUI + Emotion)
+
+- `src/theme/`:
+  - `src/theme/index.tsx`: re-exports and public theme API.
+  - `src/theme/globalStyles.tsx`: all global CSS-in-JS rules (scrollbars, html/body/root layout).
+  - `src/theme/tokens.ts`: single source of truth for design tokens (colors, breakpoints, typography scale).
+  - `src/theme/core/`:
+    - `index.ts`: theme factory `createAppTheme(mode, locale)` and locale->direction/fontFamily mapping
+    - `palette.ts`: builds MUI palette from tokens (mode-dependent)
+    - `typography.ts`: MUI typography variants derived from tokens
+    - `components.tsx`: MUI component overrides (Button/Card/etc)
+
+## Localization Resources
+
+- `src/locales/`:
+  - Put `*.json` message catalogs per locale (e.g. `en.json`, `ar.json`).
+  - Update `LocalizationProvider.tsx` to include/select new locales.
+  - Do not embed translations in UI components; use `react-intl` messages.
+
+## Types
+
+- `src/types/`:
+  - `custom.ts`: app domain types (e.g. `LocaleType`, `ThemeMode`).
+  - `theme.d.ts`: MUI theme augmentation (e.g. `Palette` extensions).
+  - When adding new typed palette keys or theme fields, update both:
+    - the theme builder files under `src/theme/`
+    - the module augmentation in `src/types/theme.d.ts`
+
+## Utilities
+
+- `src/utils/`:
+  - Put non-React helper functions here (storage helpers, numeric/unit helpers, formatting).
+  - Keep them environment-appropriate:
+    - If a utility touches `localStorage`, ensure it’s only called in browser contexts (Providers are already browser-only in this template).
+
+## Assets
+
+- `src/assets/`: static assets (SVGs, images). Import from components when needed.
+
+## New UI Components (Not Global Providers)
+
+- Create `src/components/` for reusable UI components that are not providers and not theme logic.
+- Inside `src/components/`, prefer domain grouping (e.g. `src/components/forms/`, `src/components/layout/`) if the component count grows.
+
+# Preferred Libraries (How to Use)
+
+## Styling / Theming
+
+- Use MUI components directly for UI building blocks (`@mui/material`).
+- Use MUI theming via:
+  - `src/theme/tokens.ts` for tokens
+  - `src/theme/core/palette.ts`, `src/theme/core/typography.ts`, `src/theme/core/components.tsx` for theme output
+  - `src/theme/core/index.ts` for `createAppTheme`
+- Use `CssBaseline` for baseline styling (already in `AppThemeProvider`).
+- Use Emotion CacheProvider to handle RTL properly (already in `AppThemeProvider`).
+
+## i18n
+
+- Use `react-intl`:
+  - Messages come from `src/locales/*.json`.
+  - Consumers should use `react-intl` APIs (e.g. `FormattedMessage` / hooks) rather than reading raw JSON directly.
+
+## State Management
+
+- Do not add Redux/Zustand/Recoil for this template unless explicitly requested.
+- Default pattern is:
+  - React Context for cross-cutting state (theme, locale).
+  - Persistence via `src/utils/local-storage.ts` (e.g. for theme mode and locale).
+
+# Best Practices (Project-Specific)
+
+## Performance
+
+- Memoize theme objects when mode/locale can change at runtime:
+  - Always follow the provider pattern: `useMemo(() => createAppTheme(mode, locale), [mode, locale])`.
+- Memoize derived values:
+  - Locale-dependent messages should be `useMemo`’d (as in `LocalizationProvider`).
+  - RTL flags should be `useMemo`’d from locale.
+- Use `useCallback` for context actions exposed to consumers:
+  - Example: `toggleTheme`, `setLocale`.
+- Avoid creating large objects/functions inside render for components that re-render often.
+- For future expansions:
+  - Consider `React.lazy` + `Suspense` for heavy route-level components (if routing is added).
+
+## Theming Correctness Rules
+
+- Do not introduce new raw hex color values in palette/component override code.
+- All new colors should be added to `src/theme/tokens.ts` and consumed by `src/theme/core/*`.
+- Mode-dependent styling must use `theme.palette.*` or `theme.applyStyles('dark', ...)`.
+- If you add new palette keys (custom fields), update `src/types/theme.d.ts` so TS autocomplete stays correct.
+
+## RTL / Locale Rules
+
+- Keep “locale -> direction + fontFamily” centralized in `src/theme/core/index.ts` (`createAppTheme` / helper).
+- Keep DOM updates (`document.documentElement.dir/lang`) inside `LocalizationProvider` (or other Providers), never inside leaf components.
+
+## Storage Rules
+
+- Use `getStorage` / `setStorage` from `src/utils/local-storage.ts` rather than calling `localStorage` directly in UI components.
+- Treat storage keys as stable constants (you may add local constants near Providers for new keys).
+
+## Lint / Maintainability
+
+- Respect ESLint rules for unused variables and React Hooks.
+- Keep new files small and purpose-driven (theme builders should stay focused; Providers should orchestrate state + side effects only).
+- Use the existing patterns as templates (Providers + theme core + tokens) rather than inventing parallel systems.
+
+# Reference Notes
+
+- Follow the guidance in `src/theme/THEME_AUDIT.md` when extending the theme architecture.
+- This template intentionally does not include Tailwind; do not introduce Tailwind unless the project requirements change.
+
+## Code Modularity & Maintainability
+
+- Strictly avoid monolithic files or bloated components: each file should have a single responsibility.
+- If a React component exceeds 150 lines, split it into smaller sub-components (keep each sub-component focused and composable).
+- Avoid “god components”: prefer composing smaller UI components from the main component.
+- Keep related logic together (usually in a Provider or a feature hook) rather than scattering it across unrelated files.
+
+## Separation of Concerns (Logic vs UI)
+
+- This is a priority: keep UI (JSX/MUI rendering) separated from business logic (state management, API calls, complex calculations).
+- Main component files should ideally:
+  - call one or more custom hooks that own logic
+  - render the UI structure (JSX + MUI components)
+  - pass only the necessary data/actions down to sub-components
+- Business logic must live in:
+  - Providers (for cross-cutting state + side effects), or
+  - custom hooks (for feature/local logic), or
+  - dedicated modules (for pure computations).
+
+## Use Custom Hooks for Logic
+
+- Use custom hooks (e.g. `useProfileLogic.ts`) to encapsulate business logic and return a small, UI-friendly API.
+- Custom hooks must not render JSX; they should only:
+  - manage state
+  - perform effects (where appropriate)
+  - call APIs / perform async work
+  - compute derived data for the UI
+- File placement:
+  - create `src/hooks/` for reusable logic hooks
+  - when hooks grow, group by feature or domain (e.g. `src/hooks/profile/useProfileLogic.ts`)
+
+## Clean & Semantic Naming
+
+- Variables, functions, and components must have highly descriptive, self-documenting names.
+- Avoid abbreviations. Prefer clarity (e.g. use `isUserAuthenticated` instead of `isAuth`).
+- Naming patterns:
+  - booleans: prefix with `is/has/can/should` (e.g. `isRTL`, `hasError`, `canSubmit`)
+  - callbacks/actions: use verbs (`fetchUser`, `toggleTheme`, `updateLocale`)
+  - types/interfaces: describe the shape/purpose (`UserProfile`, `LocalizationContextType`)
+
+## Readability for Other Developers
+
+- Write code as if another developer will maintain it tomorrow.
+- Use clear comments only for “Why” something is done (design intent / constraints / non-obvious decisions).
+- Do not add comments that merely restate the code (“What”); remove such comments during refactors.
+
+## Senior Architect Mode (Strict)
+
+- Always prioritize **Scalability** and **Maintainability** over simplicity.
+- Use **Enterprise Patterns**: Whenever a feature is added, suggest a modular structure (Feature-based folder structure).
+- **No Junior Code**: Avoid inline logic, avoid monolithic files, and always suggest Industry-Standard libraries or patterns (like Data Routers, Custom Hooks, and Provider Composition).
+- **Anticipate Growth**: If I ask for a feature, assume the project will eventually have hundreds of pages and thousands of users.

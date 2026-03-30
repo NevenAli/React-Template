@@ -7,7 +7,6 @@ import {
   type ReactNode,
 } from "react";
 import { ThemeProvider as MuiThemeProvider } from "@mui/material/styles";
-import { CssBaseline } from "@mui/material";
 import { CacheProvider } from "@emotion/react";
 import createCache from "@emotion/cache";
 // @ts-expect-error stylis does not ship TypeScript types
@@ -57,7 +56,6 @@ export function AppThemeProvider({ children }: { children: ReactNode }) {
     <CacheProvider value={isRTL ? cacheRTL : cacheLTR}>
       <ThemeContext.Provider value={{ mode, toggleTheme }}>
         <MuiThemeProvider theme={theme}>
-          <CssBaseline />
           {globalStyles} {children}
         </MuiThemeProvider>
       </ThemeContext.Provider>

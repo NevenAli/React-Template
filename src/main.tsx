@@ -1,14 +1,10 @@
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
-import App from "./App.tsx";
-import { LocalizationProvider, AppThemeProvider } from "@/providers";
+import { RouterProvider } from "react-router-dom";
+import { router } from "@/routes";
 
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
-    <LocalizationProvider>
-      <AppThemeProvider>
-        <App />
-      </AppThemeProvider>
-    </LocalizationProvider>
+    <RouterProvider router={router} />
   </StrictMode>,
 );
